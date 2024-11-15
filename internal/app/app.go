@@ -43,8 +43,8 @@ func New(cfg *config.Config) *App {
     clickUseCase := usecase.NewClickUseCase(clickRepo)
     grpcServer := grpc.NewServer()
     
-    clickHandler := handler.NewClickHandler(clickUseCase)
-    grpcHandler := handler.NewHandler(clickHandler)
+    counterHandler := handler.NewCounterHandler(clickUseCase)
+    grpcHandler := handler.NewHandler(counterHandler)
     grpcHandler.Register(grpcServer)
 
     router := mux.NewRouter()
