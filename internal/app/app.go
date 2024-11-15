@@ -13,7 +13,7 @@ import (
 
     "clicker/internal/application/usecase"
     "clicker/internal/config"
-    "clicker/internal/infrastructure/persistence/postgres"
+    cache "clicker/internal/infrastructure/persistence/redis"
     "clicker/internal/interfaces/grpc/handler"
     "clicker/pkg/counter"
     "clicker/pkg/stats"
@@ -39,12 +39,17 @@ func New(cfg *config.Config) *App {
         DB:       cfg.RedisDB,
     })
 
-    clickRepo := postgres.NewClickRepository(rdb)
+    statsRepo := cache.NewStatsRepository(rdb)
+    statsUseCase := usecase.NewStatsUseCase(statsRepo)
+    statsHandler := handler.NewStatsHandler(statsUseCase)
+
+    clickRepo := cache.NewClickRepository(rdb)
     clickUseCase := usecase.NewClickUseCase(clickRepo)
+    clickHandler := handler.NewClickHandler(clickUseCase)
+
     grpcServer := grpc.NewServer()
     
-    counterHandler := handler.NewCounterHandler(clickUseCase)
-    grpcHandler := handler.NewHandler(counterHandler)
+    grpcHandler := handler.NewHandler(clickHandler, statsHandler)
     grpcHandler.Register(grpcServer)
 
     router := mux.NewRouter()

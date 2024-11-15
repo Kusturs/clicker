@@ -11,16 +11,18 @@ type Handler interface {
 }
 
 type GRPCHandler struct {
-	counterHandler *CounterHandler
+	clickHandler *ClickHandler
+	statsHandler *StatsHandler
 }
 
-func NewHandler(counterHandler *CounterHandler) Handler {
+func NewHandler(clickHandler *ClickHandler, statsHandler *StatsHandler) Handler {
 	return &GRPCHandler{
-		counterHandler: counterHandler,
+		clickHandler: clickHandler,
+		statsHandler: statsHandler,
 	}
 }
 
 func (h *GRPCHandler) Register(grpcServer *grpc.Server) {
-	counter.RegisterCounterServiceServer(grpcServer, h.counterHandler)
-	stats.RegisterStatsServiceServer(grpcServer, h.counterHandler)
+	counter.RegisterCounterServiceServer(grpcServer, h.clickHandler)
+	stats.RegisterStatsServiceServer(grpcServer, h.statsHandler)
 }

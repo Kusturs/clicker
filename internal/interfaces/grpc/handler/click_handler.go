@@ -9,17 +9,17 @@ import (
     "clicker/pkg/stats"
 )
 
-type CounterHandler struct {
+type ClickHandler struct {
     counter.UnimplementedCounterServiceServer
     stats.UnimplementedStatsServiceServer
     useCase repository.ClickUseCase
 }
 
-func NewCounterHandler(useCase repository.ClickUseCase) *CounterHandler {
-    return &CounterHandler{useCase: useCase}
+func NewClickHandler(useCase repository.ClickUseCase) *ClickHandler {
+    return &ClickHandler{useCase: useCase}
 }
 
-func (h *CounterHandler) Counter(ctx context.Context, req *counter.CounterRequest) (*counter.CounterResponse, error) {
+func (h *ClickHandler) Counter(ctx context.Context, req *counter.CounterRequest) (*counter.CounterResponse, error) {
     total, err := h.useCase.Counter(ctx, req.BannerId)
     if err != nil {
         return nil, err
@@ -27,7 +27,7 @@ func (h *CounterHandler) Counter(ctx context.Context, req *counter.CounterReques
     return &counter.CounterResponse{TotalClicks: total}, nil
 }
 
-func (h *CounterHandler) Stats(ctx context.Context, req *stats.StatsRequest) (*stats.StatsResponse, error) {
+func (h *ClickHandler) Stats(ctx context.Context, req *stats.StatsRequest) (*stats.StatsResponse, error) {
     clicks, err := h.useCase.Stats(ctx, req.BannerId, 
         time.Unix(req.TsFrom, 0), 
         time.Unix(req.TsTo, 0))
