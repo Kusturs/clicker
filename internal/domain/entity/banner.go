@@ -1,4 +1,4 @@
-package domain
+package entity
 
 type Banner struct {
     ID   int64  `json:"id"`

@@ -78,6 +78,7 @@ services:
       retries: 5
     networks:
       - clicks-network
+    command: redis-server --maxmemory 2gb --maxmemory-policy allkeys-lru --save 900 1 --save 300 10
 
 networks:
   clicks-network:
