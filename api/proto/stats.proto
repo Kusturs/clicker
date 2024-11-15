@@ -1,0 +1,31 @@
+syntax = "proto3";
+
+package clicker;
+
+import "google/api/annotations.proto";
+
+option go_package = "clicker/pkg/stats";
+
+service StatsService {
+    rpc Stats(StatsRequest) returns (StatsResponse) {
+        option (google.api.http) = {
+            post: "/stats/{banner_id}"
+            body: "*"
+        };
+    }
+}
+
+message StatsRequest {
+    int64 banner_id = 1;
+    int64 ts_from = 2;
+    int64 ts_to = 3;
+}
+
+message StatsResponse {
+    message ClickStats {
+        int64 timestamp = 1;
+        int32 count = 2;
+    }
+    
+    repeated ClickStats stats = 1;
+}

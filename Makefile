@@ -10,7 +10,9 @@ MIGRATIONS_DIR=migrations
 PROJECT_NAME=clicks-counter
 NETWORK=$(PROJECT_NAME)_clicks-network
 PROTO_DIR=api/proto
-GEN_DIR=pkg/clicker
+
+COUNTER_PKG=pkg/counter
+STATS_PKG=pkg/stats
 
 up:
 	$(DC) up
@@ -70,11 +72,24 @@ redis-logs:
 
 proto:
 	@echo "Generating proto files..."
-	@mkdir -p $(GEN_DIR)
-	protoc --go_out=. \
+	@mkdir -p $(COUNTER_PKG) $(STATS_PKG)
+	
+	protoc -I=$(PROTO_DIR) \
+		--go_out=$(COUNTER_PKG) \
 		--go_opt=paths=source_relative \
-		--go-grpc_out=. \
+		--go-grpc_out=$(COUNTER_PKG) \
 		--go-grpc_opt=paths=source_relative \
-		$(PROTO_DIR)/*.proto
+		--grpc-gateway_out=$(COUNTER_PKG) \
+		--grpc-gateway_opt=paths=source_relative \
+		$(PROTO_DIR)/counter.proto
+	
+	protoc -I=$(PROTO_DIR) \
+		--go_out=$(STATS_PKG) \
+		--go_opt=paths=source_relative \
+		--go-grpc_out=$(STATS_PKG) \
+		--go-grpc_opt=paths=source_relative \
+		--grpc-gateway_out=$(STATS_PKG) \
+		--grpc-gateway_opt=paths=source_relative \
+		$(PROTO_DIR)/stats.proto
 
 .DEFAULT_GOAL := start

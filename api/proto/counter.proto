@@ -1,0 +1,23 @@
+syntax = "proto3";
+
+package clicker;
+
+import "google/api/annotations.proto";
+
+option go_package = "clicker/pkg/counter";
+
+service CounterService {
+    rpc Counter(CounterRequest) returns (CounterResponse) {
+        option (google.api.http) = {
+            get: "/counter/{banner_id}"
+        };
+    }
+}
+
+message CounterRequest {
+    int64 banner_id = 1;
+}
+
+message CounterResponse {
+    int64 total_clicks = 1;
+}
