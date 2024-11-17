@@ -6,23 +6,31 @@ import (
 	"google.golang.org/grpc"
 )
 
-type Handler interface {
+type GRPCServer interface {
 	Register(*grpc.Server)
 }
 
-type GRPCHandler struct {
-	clickHandler *ClickHandler
-	statsHandler *StatsHandler
+type ClickService interface {
+	counter.CounterServiceServer
 }
 
-func NewHandler(clickHandler *ClickHandler, statsHandler *StatsHandler) Handler {
-	return &GRPCHandler{
-		clickHandler: clickHandler,
-		statsHandler: statsHandler,
+type StatsService interface {
+	stats.StatsServiceServer
+}
+
+type Handler struct {
+	clickService ClickService
+	statsService StatsService
+}
+
+func NewHandler(clickService ClickService, statsService StatsService) *Handler {
+	return &Handler{
+		clickService: clickService,
+		statsService: statsService,
 	}
 }
 
-func (h *GRPCHandler) Register(grpcServer *grpc.Server) {
-	counter.RegisterCounterServiceServer(grpcServer, h.clickHandler)
-	stats.RegisterStatsServiceServer(grpcServer, h.statsHandler)
+func (h *Handler) Register(server *grpc.Server) {
+	counter.RegisterCounterServiceServer(server, h.clickService)
+	stats.RegisterStatsServiceServer(server, h.statsService)
 }

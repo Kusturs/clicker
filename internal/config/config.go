@@ -3,27 +3,37 @@ package config
 import (
     "fmt"
     "os"
+    "strconv"
 
     "github.com/joho/godotenv"
 )
 
+type PostgresConfig struct {
+    Host     string
+    Port     string
+    User     string
+    Password string
+    Database string
+    DSN      string
+}
+
+type RedisConfig struct {
+    Host     string
+    Port     string
+    Password string
+    DB       int
+}
+
+type ServerConfig struct {
+    Host string
+    Port string
+}
+
 type Config struct {
-    PostgresHost     string
-    PostgresPort     string
-    PostgresUser     string
-    PostgresPassword string
-    PostgresDB       string
-
-    RestHost string
-    RestPort string
-
-    GrpcHost string
-    GrpcPort string
-
-    RedisHost     string
-    RedisPort     string
-    RedisPassword string
-    RedisDB       int
+    Postgres PostgresConfig
+    Redis    RedisConfig
+    Rest     ServerConfig
+    Grpc     ServerConfig
 }
 
 func New() (*Config, error) {
@@ -32,56 +42,70 @@ func New() (*Config, error) {
     }
 
     return &Config{
-        PostgresHost:     getEnv("POSTGRES_HOST", "localhost"),
-        PostgresPort:     getEnv("POSTGRES_PORT", "5432"),
-        PostgresUser:     getEnv("POSTGRES_USER", "clicks_user"),
-        PostgresPassword: getEnv("POSTGRES_PASSWORD", "clicks_password"),
-        PostgresDB:       getEnv("POSTGRES_DB", "clicks_db"),
-
-        RestHost: getEnv("REST_HOST", "0.0.0.0"),
-        RestPort: getEnv("REST_PORT", "8080"),
-
-        GrpcHost: getEnv("GRPC_HOST", "0.0.0.0"),
-        GrpcPort: getEnv("GRPC_PORT", "50051"),
-
-        RedisHost:     getEnv("REDIS_HOST", "localhost"),
-        RedisPort:     getEnv("REDIS_PORT", "6379"),
-        RedisPassword: getEnv("REDIS_PASSWORD", ""),
-        RedisDB:       0,
+        Postgres: PostgresConfig{
+            Host:     getEnv("POSTGRES_HOST", "localhost"),
+            Port:     getEnv("POSTGRES_PORT", "5432"),
+            User:     getEnv("POSTGRES_USER", "clicks_user"),
+            Password: getEnv("POSTGRES_PASSWORD", "clicks_password"),
+            Database: getEnv("POSTGRES_DB", "clicks_db"),
+            DSN:      getEnv("POSTGRES_DSN", ""),
+        },
+        Redis: RedisConfig{
+            Host:     getEnv("REDIS_HOST", "localhost"),
+            Port:     getEnv("REDIS_PORT", "6379"),
+            Password: getEnv("REDIS_PASSWORD", ""),
+            DB:       getEnvAsInt("REDIS_DB", 0),
+        },
+        Rest: ServerConfig{
+            Host: getEnv("REST_HOST", "0.0.0.0"),
+            Port: getEnv("REST_PORT", "8080"),
+        },
+        Grpc: ServerConfig{
+            Host: getEnv("GRPC_HOST", "0.0.0.0"),
+            Port: getEnv("GRPC_PORT", "50051"),
+        },
     }, nil
 }
 
 func (c *Config) GetPostgresDSN() string {
-    dsn := os.Getenv("POSTGRES_DSN")
-    if dsn != "" {
-        return dsn
+    if c.Postgres.DSN != "" {
+        return c.Postgres.DSN
     }
     
     return fmt.Sprintf(
         "postgres://%s:%s@%s:%s/%s?sslmode=disable",
-        c.PostgresUser,
-        c.PostgresPassword,
-        c.PostgresHost,
-        c.PostgresPort,
-        c.PostgresDB,
+        c.Postgres.User,
+        c.Postgres.Password,
+        c.Postgres.Host,
+        c.Postgres.Port,
+        c.Postgres.Database,
     )
 }
 
 func (c *Config) GetRestAddress() string {
-    return fmt.Sprintf("%s:%s", c.RestHost, c.RestPort)
+    return fmt.Sprintf("%s:%s", c.Rest.Host, c.Rest.Port)
 }
 
 func (c *Config) GetGrpcAddress() string {
-    return fmt.Sprintf("%s:%s", c.GrpcHost, c.GrpcPort)
+    return fmt.Sprintf("%s:%s", c.Grpc.Host, c.Grpc.Port)
 }
 
 func (c *Config) GetRedisAddress() string {
-    return fmt.Sprintf("%s:%s", c.RedisHost, c.RedisPort)
+    return fmt.Sprintf("%s:%s", c.Redis.Host, c.Redis.Port)
 }
 
 func getEnv(key, defaultValue string) string {
     if value, exists := os.LookupEnv(key); exists {
         return value
+    }
+    return defaultValue
+}
+
+func getEnvAsInt(key string, defaultValue int) int {
+    if value, exists := os.LookupEnv(key); exists {
+        if intValue, err := strconv.Atoi(value); err == nil {
+            return intValue
+        }
     }
     return defaultValue
 }

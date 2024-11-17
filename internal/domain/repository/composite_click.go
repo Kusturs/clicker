@@ -3,6 +3,7 @@ package repository
 import (
     "context"
     "log"
+    "sync"
     "time"
     
     "clicker/internal/domain/entity"
@@ -33,14 +34,30 @@ func (r *compositeClickRepository) SaveBatch(ctx context.Context, clicks []*enti
 }
 
 func (r *compositeClickRepository) GetStats(ctx context.Context, bannerID int64, from, to time.Time) ([]*entity.Click, error) {
-    boundaryTime := time.Now().Add(-24 * time.Hour)
+    var (
+        redisClicks, pgClicks []*entity.Click
+        redisErr, pgErr error
+        wg sync.WaitGroup
+    )
 
-    if to.After(boundaryTime) {
-        clicks, err := r.redis.GetStats(ctx, bannerID, from, to)
-        if err == nil && len(clicks) > 0 {
-            return clicks, nil
-        }
+    if to.After(time.Now().Add(-24 * time.Hour)) {
+        wg.Add(1)
+        go func() {
+            defer wg.Done()
+            redisClicks, redisErr = r.redis.GetStats(ctx, bannerID, from, to)
+        }()
     }
 
-    return r.postgres.GetStats(ctx, bannerID, from, to)
+    wg.Add(1)
+    go func() {
+        defer wg.Done()
+        pgClicks, pgErr = r.postgres.GetStats(ctx, bannerID, from, to)
+    }()
+
+    wg.Wait()
+    
+    if redisErr == nil && len(redisClicks) > 0 {
+        return redisClicks, nil
+    }
+    return pgClicks, pgErr
 }

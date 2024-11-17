@@ -1,4 +1,4 @@
-.PHONY: up down migrate postgres recreate-db build logs test test-verbose test-coverage proto
+.PHONY: up down build logs postgres recreate-db migrate seed restart-app app-logs db-logs start reset-db redis-cli redis-logs init proto
 
 DC=docker compose
 DB_USER=clicks_user
@@ -75,6 +75,8 @@ redis-cli:
 
 redis-logs:
 	$(DC) logs -f redis
+
+init: migrate seed build up
 
 proto:
 	@echo "Generating proto files..."

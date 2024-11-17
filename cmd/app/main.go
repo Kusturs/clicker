@@ -13,8 +13,12 @@ func main() {
         log.Fatalf("Failed to load config: %v", err)
     }
 
-    app := app.New(cfg)
-    if err := app.Run(); err != nil {
+    manager, err := app.NewServerManager(cfg)
+    if err != nil {
+        log.Fatalf("Failed to create server manager: %v", err)
+    }
+
+    if err := manager.Run(); err != nil {
         log.Fatalf("Application error: %v", err)
     }
 }
