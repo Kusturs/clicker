@@ -49,7 +49,10 @@ func NewServerManager(cfg *config.Config) (*ServerManager, error) {
     }
     
     handlers := buildHandlers(services)
-    servers := buildServers(cfg, handlers)
+    servers, err := buildServers(cfg, handlers)
+    if err != nil {
+        return nil, fmt.Errorf("failed to build servers: %w", err)
+    }
 
     return &ServerManager{
         cfg:        cfg,
@@ -107,11 +110,16 @@ type Servers struct {
     grpc *grpc.Server
 }
 
-func buildServers(cfg *config.Config, h *handler.Handler) *Servers {
-    return &Servers{
-        http: buildHTTPServer(cfg, buildGatewayMux(cfg)),
-        grpc: buildGRPCServer(h),
+func buildServers(cfg *config.Config, h *handler.Handler) (*Servers, error) {
+    gwmux, err := buildGatewayMux(cfg)
+    if err != nil {
+        return nil, fmt.Errorf("failed to build gateway mux: %w", err)
     }
+
+    return &Servers{
+        http: buildHTTPServer(cfg, gwmux),
+        grpc: buildGRPCServer(h),
+    }, nil
 }
 
 func buildHandlers(services *Services) *handler.Handler {
@@ -148,24 +156,29 @@ func (m *ServerManager) handleShutdown(ctx context.Context, errChan chan error) 
 }
 
 func (m *ServerManager) gracefulShutdown(ctx context.Context) error {
-    log.Println("Starting graceful shutdown...")
+    log.Println("starting graceful shutdown...")
+    var errs []error
 
     shutdownCtx, cancel := context.WithTimeout(ctx, 5*time.Second)
     defer cancel()
 
     if err := m.httpServer.Shutdown(shutdownCtx); err != nil {
-        log.Printf("HTTP server shutdown error: %v", err)
+        errs = append(errs, fmt.Errorf("http server shutdown error: %w", err))
     }
 
     m.grpcServer.GracefulStop()
     
     if err := m.services.redis.Close(); err != nil {
-        log.Printf("Redis connection close error: %v", err)
+        errs = append(errs, fmt.Errorf("redis connection close error: %w", err))
     }
 
     m.services.db.Close()
 
-    log.Println("Graceful shutdown completed")
+    log.Println("graceful shutdown completed")
+    
+    if len(errs) > 0 {
+        return fmt.Errorf("shutdown errors: %v", errs)
+    }
     return nil
 }
 
@@ -222,22 +235,21 @@ func healthCheckHandler(w http.ResponseWriter, r *http.Request) {
     fmt.Fprintf(w, "REST API is working")
 }
 
-func buildGatewayMux(cfg *config.Config) *runtime.ServeMux {
+func buildGatewayMux(cfg *config.Config) (*runtime.ServeMux, error) {
     gwmux := runtime.NewServeMux()
-    
     opts := []grpc.DialOption{grpc.WithTransportCredentials(insecure.NewCredentials())}
     
     if err := counter.RegisterCounterServiceHandlerFromEndpoint(context.Background(), 
         gwmux, cfg.GetGrpcAddress(), opts); err != nil {
-        log.Fatalf("Failed to register counter gateway: %v", err)
+        return nil, fmt.Errorf("failed to register counter gateway: %w", err)
     }
 
     if err := stats.RegisterStatsServiceHandlerFromEndpoint(context.Background(), 
         gwmux, cfg.GetGrpcAddress(), opts); err != nil {
-        log.Fatalf("Failed to register stats gateway: %v", err)
+        return nil, fmt.Errorf("failed to register stats gateway: %w", err)
     }
 
-    return gwmux
+    return gwmux, nil
 }
 
 func (m *ServerManager) runHTTPServer(errChan chan<- error) {

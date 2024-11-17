@@ -1,54 +1,106 @@
 package main
 
 import (
+    "context"
     "fmt"
-    "net/http"
+    "sync"
     "time"
-    
-    vegeta "github.com/tsenart/vegeta/v12/lib"
+    "sync/atomic"
+    "net/http"
+    "io"
+    "sort"
+    "encoding/json"
 )
 
-func runLoadTest(rps int) {
-    fmt.Printf("\nТестирование %d RPS:\n", rps)
-    fmt.Printf("====================\n")
-    
-    rate := vegeta.Rate{Freq: rps, Per: time.Second}
-    duration := 30 * time.Second
-    
-    targeter := vegeta.NewStaticTargeter(vegeta.Target{
-        Method: "GET",
-        URL:    "http://localhost:8080/counter/1",
-        Header: http.Header{
-            "Content-Type": []string{"application/json"},
-        },
-    })
-
-    attacker := vegeta.NewAttacker(
-        vegeta.Timeout(5*time.Second),
-        vegeta.Workers(10),
-        vegeta.MaxWorkers(20),
-    )
-
-    var metrics vegeta.Metrics
-    for res := range attacker.Attack(targeter, rate, duration, "Load Test") {
-        metrics.Add(res)
-    }
-    metrics.Close()
-
-    fmt.Printf("99th percentile: %s\n", metrics.Latencies.P99)
-    fmt.Printf("95th percentile: %s\n", metrics.Latencies.P95)
-    fmt.Printf("Mean: %s\n", metrics.Latencies.Mean)
-    fmt.Printf("Max: %s\n", metrics.Latencies.Max)
-    fmt.Printf("Success rate: %.2f%%\n", metrics.Success*100)
-    fmt.Printf("Throughput: %.2f RPS\n", metrics.Throughput)
+type CounterResponse struct {
+    TotalClicks int64 `json:"total_clicks"`
 }
 
 func main() {
-    // Тестируем разные уровни нагрузки
-    loads := []int{500, 1000, 2000, 3000, 4000, 5000}
+    fmt.Println("Тест максимальной нагрузки за 1 секунду...")
     
-    for _, rps := range loads {
-        runLoadTest(rps)
-        time.Sleep(5 * time.Second) // Пауза между тестами
+    ctx, cancel := context.WithTimeout(context.Background(), 1*time.Second)
+    defer cancel()
+    
+    var (
+        wg sync.WaitGroup
+        successCount atomic.Int64
+        errorCount atomic.Int64
+        latencies []time.Duration
+        latencyMutex sync.Mutex
+    )
+    
+    // Запускаем горутины
+    for i := 0; i < 250; i++ {
+        wg.Add(1)
+        go func() {
+            defer wg.Done()
+            
+            for {
+                select {
+                case <-ctx.Done():
+                    return
+                default:
+                    start := time.Now()
+                    resp, err := http.Get("http://localhost:8080/counter/1")
+                    duration := time.Since(start)
+                    
+                    if err != nil {
+                        errorCount.Add(1)
+                        continue
+                    }
+                    
+                    // Проверяем статус ответа
+                    if resp.StatusCode != http.StatusOK {
+                        resp.Body.Close()
+                        errorCount.Add(1)
+                        continue
+                    }
+                    
+                    // Читаем и проверяем ответ
+                    body, err := io.ReadAll(resp.Body)
+                    resp.Body.Close()
+                    if err != nil {
+                        errorCount.Add(1)
+                        continue
+                    }
+                    
+                    // Парсим ответ
+                    var result CounterResponse
+                    if err := json.Unmarshal(body, &result); err != nil {
+                        errorCount.Add(1)
+                        continue
+                    }
+                    
+                    // Сохраняем латентность
+                    latencyMutex.Lock()
+                    latencies = append(latencies, duration)
+                    latencyMutex.Unlock()
+                    
+                    successCount.Add(1)
+                }
+            }
+        }()
+    }
+    
+    // Ждем завершения
+    <-ctx.Done()
+    wg.Wait()
+    
+    // Анализируем результаты
+    fmt.Printf("За 1 секунду:\n")
+    fmt.Printf("Успешных запросов: %d\n", successCount.Load())
+    fmt.Printf("Ошибок: %d\n", errorCount.Load())
+    
+    // Считаем статистику по латентности
+    sort.Slice(latencies, func(i, j int) bool {
+        return latencies[i] < latencies[j]
+    })
+    
+    if len(latencies) > 0 {
+        p95 := latencies[len(latencies)*95/100]
+        p99 := latencies[len(latencies)*99/100]
+        fmt.Printf("Латентность P95: %v\n", p95)
+        fmt.Printf("Латентность P99: %v\n", p99)
     }
 }

@@ -25,40 +25,13 @@ type clickUseCase struct {
 func NewClickUseCase(repo repository.ClickRepository) ClickUseCase {
     uc := &clickUseCase{
         repo:         repo,
-        clickChan:    make(chan *entity.Click, 1000),
-        batchSize:    100,
-        batchTimeout: time.Second,
+        clickChan:    make(chan *entity.Click, 5000),
+        batchSize:    500,
+        batchTimeout: 500 * time.Millisecond,
     }
     go uc.processBatch()
     return uc
 }
-
-// func (uc *clickUseCase) Counter(ctx context.Context, bannerID int64) (int64, error) {
-//     select {
-//     case uc.clickChan <- &entity.Click{
-//         BannerID:  bannerID,
-//         Timestamp: time.Now(),
-//         Count:     1,
-//     }:
-//         now := time.Now()
-//         from := now.Add(-24 * time.Hour)
-//         clicks, err := uc.repo.GetStats(ctx, bannerID, from, now)
-//         if err != nil {
-//             log.Printf("Failed to get stats: %v", err)
-//             return 1, nil
-//         }
-        
-//         var total int64 = 1
-//         for _, click := range clicks {
-//             total += int64(click.Count)
-//         }
-//         return total, nil
-        
-//     case <-ctx.Done():
-//         return 0, ctx.Err()
-//     }
-// }
-
 
 func (uc *clickUseCase) Counter(ctx context.Context, bannerID int64) (int64, error) {
     now := time.Now()

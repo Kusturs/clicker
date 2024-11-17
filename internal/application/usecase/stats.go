@@ -3,6 +3,7 @@ package usecase
 import (
     "context"
     "fmt"
+    "log"
     "time"
     
     "clicker/internal/application/dto"
@@ -31,12 +32,20 @@ func (uc *statsUseCase) GetStats(ctx context.Context, req *dto.StatsRequest) (*d
         return nil, fmt.Errorf("invalid time range: from is after to")
     }
     
+    log.Printf("Getting stats for banner %d from %v to %v", req.BannerID, from, to)
+    
     clicks, err := uc.repo.GetStats(ctx, req.BannerID, from, to)
     if err != nil {
+        log.Printf("Error getting stats: %v", err)
         return nil, err
     }
     
+    var totalClicks int64
+    for _, click := range clicks {
+        totalClicks += int64(click.Count)
+    }
+    
     return &dto.StatsResponse{
-        Stats: dto.FromEntitySlice(clicks),
+        TotalClicks: totalClicks,
     }, nil
 }

@@ -37,3 +37,20 @@ SELECT
         WHEN 4 THEN 'Custom Deal'
     END as name
 FROM series;
+
+-- Добавляем клики для баннера #1 за последние 24 часа
+WITH RECURSIVE hours AS (
+    SELECT 
+        date_trunc('hour', NOW()) - interval '23 hours' as hour_time
+    UNION ALL
+    SELECT 
+        hour_time + interval '1 hour'
+    FROM hours
+    WHERE hour_time < date_trunc('hour', NOW())
+)
+INSERT INTO clicks (banner_id, timestamp, count)
+SELECT 
+    1 as banner_id,
+    hour_time as timestamp,
+    50 as count
+FROM hours;

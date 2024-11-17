@@ -39,27 +39,15 @@ func ToProtoResponse(resp *StatsResponse) *stats.StatsResponse {
     if resp == nil {
         return nil
     }
-    response := &stats.StatsResponse{
-        Stats: make([]*stats.StatsResponse_ClickStats, len(resp.Stats)),
+    return &stats.StatsResponse{
+        TotalClicks: resp.TotalClicks,
     }
-    
-    for i, stat := range resp.Stats {
-        response.Stats[i] = &stats.StatsResponse_ClickStats{
-            Timestamp: stat.Timestamp,
-            Count:    stat.Count,
-        }
-    }
-    
-    return response
 }
 
-func FromEntitySlice(clicks []*entity.Click) []StatItem {
-    result := make([]StatItem, len(clicks))
-    for i, click := range clicks {
-        result[i] = StatItem{
-            Timestamp: click.Timestamp.Unix(),
-            Count:    int32(click.Count),
-        }
+func TotalClicksFromEntity(clicks []*entity.Click) int64 {
+    var total int64
+    for _, click := range clicks {
+        total += int64(click.Count)
     }
-    return result
+    return total
 }

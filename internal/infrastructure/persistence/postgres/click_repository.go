@@ -2,6 +2,7 @@ package postgres
 
 import (
     "context"
+    "log"
     "time"
     
     "clicker/internal/domain/entity"
@@ -69,6 +70,8 @@ func (r *clickRepository) SaveBatch(ctx context.Context, clicks []*entity.Click)
 }
 
 func (r *clickRepository) GetStats(ctx context.Context, bannerID int64, from, to time.Time) ([]*entity.Click, error) {
+    log.Printf("Postgres: Getting stats for banner %d from %v to %v", bannerID, from, to)
+    
     rows, err := r.db.Query(ctx, `
         SELECT banner_id, date_trunc('hour', timestamp) as hour_timestamp, SUM(count) as total_count
         FROM clicks
@@ -79,6 +82,7 @@ func (r *clickRepository) GetStats(ctx context.Context, bannerID int64, from, to
         ORDER BY hour_timestamp
     `, bannerID, from, to)
     if err != nil {
+        log.Printf("Postgres: Error querying: %v", err)
         return nil, err
     }
     defer rows.Close()
@@ -87,10 +91,12 @@ func (r *clickRepository) GetStats(ctx context.Context, bannerID int64, from, to
     for rows.Next() {
         click := &entity.Click{}
         if err := rows.Scan(&click.BannerID, &click.Timestamp, &click.Count); err != nil {
+            log.Printf("Postgres: Error scanning row: %v", err)
             return nil, err
         }
         clicks = append(clicks, click)
     }
 
+    log.Printf("Postgres: Returning %d clicks", len(clicks))
     return clicks, rows.Err()
 }

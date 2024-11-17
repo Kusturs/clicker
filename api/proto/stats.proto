@@ -1,5 +1,4 @@
 syntax = "proto3";
-
 package clicker;
 
 import "google/api/annotations.proto";
@@ -22,10 +21,6 @@ message StatsRequest {
 }
 
 message StatsResponse {
-    message ClickStats {
-        int64 timestamp = 1;
-        int32 count = 2;
-    }
-    
-    repeated ClickStats stats = 1;
+    int64 total_clicks = 1;
 }
+

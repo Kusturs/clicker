@@ -7,10 +7,5 @@ type StatsRequest struct {
 }
 
 type StatsResponse struct {
-    Stats []StatItem
-}
-
-type StatItem struct {
-    Timestamp int64 `json:"timestamp"`
-    Count     int32 `json:"count"`
+    TotalClicks int64 `json:"total_clicks"`
 }
