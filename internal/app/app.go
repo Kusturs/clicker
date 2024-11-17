@@ -10,6 +10,7 @@ import (
     "os/signal"
     "syscall"
     "time"
+    "database/sql"
 
     "clicker/internal/application/usecase"
     "clicker/internal/config"
@@ -23,6 +24,7 @@ import (
     "google.golang.org/grpc"
     "github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
     "google.golang.org/grpc/credentials/insecure"
+    _ "github.com/lib/pq"
 )
 
 type App struct {
@@ -30,9 +32,19 @@ type App struct {
     router *mux.Router
     grpc   *grpc.Server
     redis  *redis.Client
+    db     *sql.DB
 }
 
 func New(cfg *config.Config) *App {
+    db, err := sql.Open("postgres", cfg.GetPostgresDSN())
+    if err != nil {
+        log.Fatalf("Failed to connect to database: %v", err)
+    }
+
+    if err = db.Ping(); err != nil {
+        log.Fatalf("Failed to ping database: %v", err)
+    }
+
     rdb := redis.NewClient(&redis.Options{
         Addr:     cfg.GetRedisAddress(),
         Password: cfg.RedisPassword,
@@ -75,6 +87,7 @@ func New(cfg *config.Config) *App {
         router: router,
         grpc:   grpcServer,
         redis:  rdb,
+        db:     db,
     }
 }
 
