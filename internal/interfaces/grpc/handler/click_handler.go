@@ -2,47 +2,28 @@ package handler
 
 import (
     "context"
-    "time"
-
-    "clicker/internal/domain/repository"
+    "clicker/internal/application/usecase"
     "clicker/pkg/counter"
-    "clicker/pkg/stats"
+    "google.golang.org/grpc/codes"
+    "google.golang.org/grpc/status"
 )
 
 type ClickHandler struct {
     counter.UnimplementedCounterServiceServer
-    stats.UnimplementedStatsServiceServer
-    useCase repository.ClickUseCase
+    useCase usecase.ClickUseCase
 }
 
-func NewClickHandler(useCase repository.ClickUseCase) *ClickHandler {
+func NewClickHandler(useCase usecase.ClickUseCase) *ClickHandler {
     return &ClickHandler{useCase: useCase}
 }
 
 func (h *ClickHandler) Counter(ctx context.Context, req *counter.CounterRequest) (*counter.CounterResponse, error) {
     total, err := h.useCase.Counter(ctx, req.BannerId)
     if err != nil {
-        return nil, err
+        return nil, status.Error(codes.Internal, err.Error())
     }
-    return &counter.CounterResponse{TotalClicks: total}, nil
-}
-
-func (h *ClickHandler) Stats(ctx context.Context, req *stats.StatsRequest) (*stats.StatsResponse, error) {
-    clicks, err := h.useCase.Stats(ctx, req.BannerId, 
-        time.Unix(req.TsFrom, 0), 
-        time.Unix(req.TsTo, 0))
-    if err != nil {
-        return nil, err
-    }
-
-    response := &stats.StatsResponse{
-        Stats: make([]*stats.StatsResponse_ClickStats, len(clicks)),
-    }
-    for i, click := range clicks {
-        response.Stats[i] = &stats.StatsResponse_ClickStats{
-            Timestamp: click.Timestamp.Unix(),
-            Count:    int32(click.Count),
-        }
-    }
-    return response, nil
+    
+    return &counter.CounterResponse{
+        TotalClicks: total,
+    }, nil
 }

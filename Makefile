@@ -7,6 +7,7 @@ DB_NAME=clicks_db
 DB_HOST=localhost
 DB_PORT=5432
 MIGRATIONS_DIR=migrations
+SEEDS_DIR=scripts
 PROJECT_NAME=clicks-counter
 NETWORK=$(PROJECT_NAME)_clicks-network
 PROTO_DIR=api/proto
@@ -47,9 +48,14 @@ migrate: recreate-db
 	done
 
 seed:
-	@echo "Seeding database with sample banners..."
-	docker exec -i $$(docker ps -q -f name=postgres) psql -U $(DB_USER) -d $(DB_NAME) < scripts/seed.sql
-	@echo "Database seeded successfully!"
+	@echo "Applying seed files..."
+	@for file in $(SEEDS_DIR)/*.sql; do \
+		if [ -f "$$file" ] && [ "$${file##*.}" = "sql" ] && ! [ "$${file%.*}" = "down" ]; then \
+			echo "Applying seed: $$file"; \
+			docker exec -i $$(docker ps -q -f name=postgres) psql -U $(DB_USER) -d $(DB_NAME) < $$file; \
+		fi \
+	done
+	@echo "Seeds applied successfully!"
 
 restart-app:
 	$(DC) restart app

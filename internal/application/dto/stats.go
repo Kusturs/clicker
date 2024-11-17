@@ -1,18 +1,16 @@
 package dto
 
-import "time"
-
 type StatsRequest struct {
     BannerID int64
-    From     time.Time
-    To       time.Time
+    TsFrom   int64
+    TsTo     int64
 }
 
 type StatsResponse struct {
-    Stats []StatsItem
+    Stats []StatItem
 }
 
-type StatsItem struct {
-    Timestamp time.Time
-    Count     int32
+type StatItem struct {
+    Timestamp int64 `json:"timestamp"`
+    Count     int32 `json:"count"`
 }

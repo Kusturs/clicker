@@ -2,9 +2,8 @@ package handler
 
 import (
     "context"
-    "time"
-
-    "clicker/internal/domain/repository"
+    "clicker/internal/application/dto"
+    "clicker/internal/application/usecase"
     "clicker/pkg/stats"
     "google.golang.org/grpc/codes"
     "google.golang.org/grpc/status"
@@ -12,37 +11,23 @@ import (
 
 type StatsHandler struct {
     stats.UnimplementedStatsServiceServer
-    useCase repository.StatsUseCase
+    useCase usecase.StatsUseCase
 }
 
-func NewStatsHandler(useCase repository.StatsUseCase) *StatsHandler {
-    return &StatsHandler{
-        useCase: useCase,
-    }
+func NewStatsHandler(useCase usecase.StatsUseCase) *StatsHandler {
+    return &StatsHandler{useCase: useCase}
 }
 
 func (h *StatsHandler) Stats(ctx context.Context, req *stats.StatsRequest) (*stats.StatsResponse, error) {
-    if req.TsFrom >= req.TsTo {
-        return nil, status.Error(codes.InvalidArgument, "ts_from must be less than ts_to")
+    dtoReq := dto.StatsRequestFromProto(req)
+    if dtoReq == nil {
+        return nil, status.Error(codes.InvalidArgument, "invalid request")
     }
 
-    clicks, err := h.useCase.GetStats(ctx, req.BannerId, 
-        time.Unix(req.TsFrom, 0), 
-        time.Unix(req.TsTo, 0))
+    dtoResp, err := h.useCase.GetStats(ctx, dtoReq)
     if err != nil {
         return nil, status.Error(codes.Internal, err.Error())
     }
 
-    response := &stats.StatsResponse{
-        Stats: make([]*stats.StatsResponse_ClickStats, len(clicks)),
-    }
-    
-    for i, click := range clicks {
-        response.Stats[i] = &stats.StatsResponse_ClickStats{
-            Timestamp: click.Timestamp.Unix(),
-            Count:    int32(click.Count),
-        }
-    }
-    
-    return response, nil
+    return dto.ToProtoResponse(dtoResp), nil
 }

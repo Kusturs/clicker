@@ -5,23 +5,38 @@ import (
     "fmt"
     "time"
     
-    "clicker/internal/domain/entity"
+    "clicker/internal/application/dto"
     "clicker/internal/domain/repository"
 )
+
+type StatsUseCase interface {
+    GetStats(ctx context.Context, req *dto.StatsRequest) (*dto.StatsResponse, error)
+}
 
 type statsUseCase struct {
     repo repository.StatsRepository
 }
 
-func NewStatsUseCase(repo repository.StatsRepository) repository.StatsUseCase {
+func NewStatsUseCase(repo repository.StatsRepository) StatsUseCase {
     return &statsUseCase{
         repo: repo,
     }
 }
 
-func (uc *statsUseCase) GetStats(ctx context.Context, bannerID int64, from, to time.Time) ([]*entity.Click, error) {
+func (uc *statsUseCase) GetStats(ctx context.Context, req *dto.StatsRequest) (*dto.StatsResponse, error) {
+    from := time.Unix(req.TsFrom, 0)
+    to := time.Unix(req.TsTo, 0)
+    
     if from.After(to) {
         return nil, fmt.Errorf("invalid time range: from is after to")
     }
-    return uc.repo.GetStats(ctx, bannerID, from, to)
+    
+    clicks, err := uc.repo.GetStats(ctx, req.BannerID, from, to)
+    if err != nil {
+        return nil, err
+    }
+    
+    return &dto.StatsResponse{
+        Stats: dto.FromEntitySlice(clicks),
+    }, nil
 }

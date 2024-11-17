@@ -26,7 +26,6 @@ func (r *clickRepository) IncrementClick(ctx context.Context, bannerID int64) (i
     }
     defer tx.Rollback()
 
-    // Вставляем новый клик
     _, err = tx.ExecContext(ctx, `
         INSERT INTO clicks (banner_id, timestamp, count)
         VALUES ($1, $2, 1)
@@ -35,7 +34,6 @@ func (r *clickRepository) IncrementClick(ctx context.Context, bannerID int64) (i
         return 0, err
     }
 
-    // Получаем общее количество кликов
     var total int64
     err = tx.QueryRowContext(ctx, `
         SELECT COALESCE(SUM(count), 0)
