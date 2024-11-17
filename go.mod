@@ -7,7 +7,6 @@ require (
 	github.com/grpc-ecosystem/grpc-gateway/v2 v2.19.0
 	github.com/jackc/pgx/v5 v5.7.1
 	github.com/joho/godotenv v1.5.1
-	github.com/lib/pq v1.10.9
 	github.com/redis/go-redis/v9 v9.5.1
 	github.com/tsenart/vegeta/v12 v12.12.0
 	google.golang.org/genproto/googleapis/api v0.0.0-20240123012728-ef4313101c80

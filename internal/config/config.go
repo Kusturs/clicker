@@ -52,12 +52,17 @@ func New() (*Config, error) {
 }
 
 func (c *Config) GetPostgresDSN() string {
+    dsn := os.Getenv("POSTGRES_DSN")
+    if dsn != "" {
+        return dsn
+    }
+    
     return fmt.Sprintf(
-        "host=%s port=%s user=%s password=%s dbname=%s sslmode=disable",
-        c.PostgresHost,
-        c.PostgresPort,
+        "postgres://%s:%s@%s:%s/%s?sslmode=disable",
         c.PostgresUser,
         c.PostgresPassword,
+        c.PostgresHost,
+        c.PostgresPort,
         c.PostgresDB,
     )
 }

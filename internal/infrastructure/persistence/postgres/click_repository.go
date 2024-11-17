@@ -2,31 +2,32 @@ package postgres
 
 import (
     "context"
-    "database/sql"
     "time"
     
     "clicker/internal/domain/entity"
     "clicker/internal/domain/repository"
+    "github.com/jackc/pgx/v5"
+    "github.com/jackc/pgx/v5/pgxpool"
 )
 
 type clickRepository struct {
-    db *sql.DB
+    db *pgxpool.Pool
 }
 
-func NewClickRepository(db *sql.DB) repository.ClickRepository {
+func NewClickRepository(db *pgxpool.Pool) repository.ClickRepository {
     return &clickRepository{
         db: db,
     }
 }
 
 func (r *clickRepository) IncrementClick(ctx context.Context, bannerID int64) (int64, error) {
-    tx, err := r.db.BeginTx(ctx, nil)
+    tx, err := r.db.Begin(ctx)
     if err != nil {
         return 0, err
     }
-    defer tx.Rollback()
+    defer tx.Rollback(ctx)
 
-    _, err = tx.ExecContext(ctx, `
+    _, err = tx.Exec(ctx, `
         INSERT INTO clicks (banner_id, timestamp, count)
         VALUES ($1, $2, 1)
     `, bannerID, time.Now())
@@ -35,7 +36,7 @@ func (r *clickRepository) IncrementClick(ctx context.Context, bannerID int64) (i
     }
 
     var total int64
-    err = tx.QueryRowContext(ctx, `
+    err = tx.QueryRow(ctx, `
         SELECT COALESCE(SUM(count), 0)
         FROM clicks
         WHERE banner_id = $1
@@ -44,7 +45,7 @@ func (r *clickRepository) IncrementClick(ctx context.Context, bannerID int64) (i
         return 0, err
     }
 
-    if err = tx.Commit(); err != nil {
+    if err = tx.Commit(ctx); err != nil {
         return 0, err
     }
 
@@ -52,33 +53,23 @@ func (r *clickRepository) IncrementClick(ctx context.Context, bannerID int64) (i
 }
 
 func (r *clickRepository) SaveBatch(ctx context.Context, clicks []*entity.Click) error {
-    tx, err := r.db.BeginTx(ctx, nil)
-    if err != nil {
-        return err
-    }
-    defer tx.Rollback()
-
-    stmt, err := tx.PrepareContext(ctx, `
-        INSERT INTO clicks (banner_id, timestamp, count)
-        VALUES ($1, $2, $3)
-    `)
-    if err != nil {
-        return err
-    }
-    defer stmt.Close()
-
+    batch := &pgx.Batch{}
+    
     for _, click := range clicks {
-        _, err = stmt.ExecContext(ctx, click.BannerID, click.Timestamp, click.Count)
-        if err != nil {
-            return err
-        }
+        batch.Queue(
+            "INSERT INTO clicks (banner_id, timestamp, count) VALUES ($1, $2, $3)",
+            click.BannerID, click.Timestamp, click.Count,
+        )
     }
-
-    return tx.Commit()
+    
+    results := r.db.SendBatch(ctx, batch)
+    defer results.Close()
+    
+    return results.Close()
 }
 
 func (r *clickRepository) GetStats(ctx context.Context, bannerID int64, from, to time.Time) ([]*entity.Click, error) {
-    rows, err := r.db.QueryContext(ctx, `
+    rows, err := r.db.Query(ctx, `
         SELECT banner_id, date_trunc('hour', timestamp) as hour_timestamp, SUM(count) as total_count
         FROM clicks
         WHERE banner_id = $1 

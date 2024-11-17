@@ -10,7 +10,6 @@ import (
     "os/signal"
     "syscall"
     "time"
-    "database/sql"
 
     "clicker/internal/application/usecase"
     "clicker/internal/config"
@@ -26,7 +25,7 @@ import (
     "google.golang.org/grpc"
     "github.com/grpc-ecosystem/grpc-gateway/v2/runtime"
     "google.golang.org/grpc/credentials/insecure"
-    _ "github.com/lib/pq"
+    "github.com/jackc/pgx/v5/pgxpool"
 )
 
 type App struct {
@@ -34,16 +33,28 @@ type App struct {
     router *mux.Router
     grpc   *grpc.Server
     redis  *redis.Client
-    db     *sql.DB
+    db     *pgxpool.Pool
 }
 
 func New(cfg *config.Config) *App {
-    db, err := sql.Open("postgres", cfg.GetPostgresDSN())
+    ctx := context.Background()
+    
+    poolConfig, err := pgxpool.ParseConfig(cfg.GetPostgresDSN())
+    if err != nil {
+        log.Fatalf("Failed to parse database config: %v", err)
+    }
+    
+    poolConfig.MaxConns = 50
+    poolConfig.MinConns = 10
+    poolConfig.MaxConnLifetime = time.Hour
+    poolConfig.MaxConnIdleTime = 30 * time.Minute
+    
+    db, err := pgxpool.NewWithConfig(ctx, poolConfig)
     if err != nil {
         log.Fatalf("Failed to connect to database: %v", err)
     }
 
-    if err = db.Ping(); err != nil {
+    if err = db.Ping(ctx); err != nil {
         log.Fatalf("Failed to ping database: %v", err)
     }
 
