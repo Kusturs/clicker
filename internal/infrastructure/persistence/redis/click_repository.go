@@ -20,17 +20,13 @@ func NewClickRepository(redis *redis.Client) repository.ClickRepository {
     }
 }
 
-func (r *clickRepository) IncrementClick(ctx context.Context, bannerID int64) (int64, error) {
-    key := fmt.Sprintf("banner:%d:clicks", bannerID)
-    return r.redis.Incr(ctx, key).Result()
-}
-
 func (r *clickRepository) SaveBatch(ctx context.Context, clicks []*entity.Click) error {
     pipe := r.redis.Pipeline()
     
     for _, click := range clicks {
         key := fmt.Sprintf("banner:%d:%d", click.BannerID, click.Timestamp.Unix()/3600)
         pipe.IncrBy(ctx, key, 1)
+        pipe.Expire(ctx, key, 24*time.Hour)
     }
     
     _, err := pipe.Exec(ctx)

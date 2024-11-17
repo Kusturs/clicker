@@ -2,6 +2,7 @@ package usecase
 
 import (
     "context"
+    "fmt"
     "time"
     "log"
 
@@ -32,29 +33,61 @@ func NewClickUseCase(repo repository.ClickRepository) ClickUseCase {
     return uc
 }
 
+// func (uc *clickUseCase) Counter(ctx context.Context, bannerID int64) (int64, error) {
+//     select {
+//     case uc.clickChan <- &entity.Click{
+//         BannerID:  bannerID,
+//         Timestamp: time.Now(),
+//         Count:     1,
+//     }:
+//         now := time.Now()
+//         from := now.Add(-24 * time.Hour)
+//         clicks, err := uc.repo.GetStats(ctx, bannerID, from, now)
+//         if err != nil {
+//             log.Printf("Failed to get stats: %v", err)
+//             return 1, nil
+//         }
+        
+//         var total int64 = 1
+//         for _, click := range clicks {
+//             total += int64(click.Count)
+//         }
+//         return total, nil
+        
+//     case <-ctx.Done():
+//         return 0, ctx.Err()
+//     }
+// }
+
+
 func (uc *clickUseCase) Counter(ctx context.Context, bannerID int64) (int64, error) {
+    now := time.Now()
+    from := now.Add(-24 * time.Hour)
+    clicks, err := uc.repo.GetStats(ctx, bannerID, from, now)
+    if err != nil {
+        log.Printf("Failed to get stats: %v", err)
+        return 0, err
+    }
+    
+    var total int64
+    for _, click := range clicks {
+        total += int64(click.Count)
+    }
+
     select {
     case uc.clickChan <- &entity.Click{
         BannerID:  bannerID,
-        Timestamp: time.Now(),
+        Timestamp: now,
         Count:     1,
     }:
-        now := time.Now()
-        from := now.Add(-24 * time.Hour)
-        clicks, err := uc.repo.GetStats(ctx, bannerID, from, now)
-        if err != nil {
-            log.Printf("Failed to get stats: %v", err)
-            return 1, nil
-        }
-        
-        var total int64 = 1
-        for _, click := range clicks {
-            total += int64(click.Count)
-        }
-        return total, nil
+        return total + 1, nil
         
     case <-ctx.Done():
-        return 0, ctx.Err()
+        return total, ctx.Err()
+        
+    default:
+        log.Printf("Click channel is full")
+        return total, fmt.Errorf("service is busy")
     }
 }
 
